@@ -1,0 +1,106 @@
+version: '2'
+
+services:
+  zookeeper:
+    image: confluentinc/cp-zookeeper:latest
+    ports:
+      - 2182:2182
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2182
+      ZOOKEEPER_TICK_TIME: 2000
+  kafka:
+    image: confluentinc/cp-kafka:latest
+    depends_on:
+      - zookeeper
+    ports:
+      - 29092:29092
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2182
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+
+  kafka-client:
+      image: confluentinc/cp-kafka:latest
+      depends_on:
+        - kafka
+      volumes:
+        - ./create-topics.sh:/tmp/create-topics.sh
+      command: [ "sh", "-c", "/tmp/create-topics.sh" ]
+  flink-jobmanager:
+     image: flink:1.14.0
+     command: jobmanager
+     environment:
+       - |
+           FLINK_PROPERTIES=
+           jobmanager.rpc.address: flink-jobmanager
+     ports:
+       - "8081:8081"
+     depends_on:
+       - kafka
+     volumes:
+       - ./backup:/backup
+       - ./ml-features:/ml-features
+
+  flink-taskmanager:
+     image: flink:1.14.0
+     command: taskmanager
+     depends_on:
+       - flink-jobmanager
+     environment:
+       - |
+           FLINK_PROPERTIES=
+           jobmanager.rpc.address: flink-jobmanager
+           taskmanager.numberOfTaskSlots: 2
+#       - JOB_MANAGER_RPC_ADDRESS=flink-jobmanager
+#       - TASKMANAGER_NUMBEROFSLOTS=2
+
+     volumes:
+       - ./backup:/backup
+       - ./ml-features:/ml-features
+
+  redis:
+     image: bitnami/redis:latest
+     ports:
+       - "6379:6379"
+     environment:
+       - ALLOW_EMPTY_PASSWORD=yes
+  transactions-producer:
+     build:
+       context: .
+       dockerfile: Dockerfile.producer
+     depends_on:
+       - kafka
+
+  transactions-backup-job:
+     build:
+       context: .
+       dockerfile: Dockerfile.backupjob
+     depends_on:
+       - kafka
+       - flink-jobmanager
+       - flink-taskmanager
+     volumes:
+       - ./backup:/app/backup
+       - ./target:/app
+#     command: ["/opt/flink/bin/flink", "run", "-m", "flink-jobmanager:8081", "/app/remotebank-transactions-1.0-SNAPSHOT-backup-job.jar"]
+     command: [ "sh", "-c", "sleep 60 && /opt/flink/bin/flink run -m flink-jobmanager:8081 /app/remotebank-transactions-1.0-SNAPSHOT-backup-job.jar" ]
+
+
+  transactions-ml-features-job:
+     build:
+       context: .
+       dockerfile: Dockerfile.mlfeaturesjob
+     depends_on:
+       - kafka
+       - flink-jobmanager
+       - flink-taskmanager
+       - redis
+       - transactions-backup-job
+     volumes:
+       - ./ml-features:/ml-features
+       - ./backup:/backup
+#     command: ["/opt/flink/bin/flink", "run", "-m", "flink-jobmanager:8081", "/app/remotebank-transactions-1.0-SNAPSHOT-backfill-job.jar"]
+     command: [ "sh", "-c", "sleep 120 && /opt/flink/bin/flink run -m flink-jobmanager:8081 /app/remotebank-transactions-1.0-SNAPSHOT-backfill-job.jar" ]
