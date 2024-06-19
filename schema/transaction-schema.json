@@ -1,0 +1,25 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Transaction",
+  "type": "object",
+  "properties": {
+    "user_id": {
+      "type": "integer"
+    },
+    "transaction_timestamp_millis": {
+      "type": "integer"
+    },
+    "amount": {
+      "type": "number"
+    },
+    "currency": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 3
+    },
+    "counterpart_id": {
+      "type": "integer"
+    }
+  },
+  "required": ["user_id", "transaction_timestamp_millis", "amount", "currency", "counterpart_id"]
+}

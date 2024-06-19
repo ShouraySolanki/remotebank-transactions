@@ -9,7 +9,4 @@ COPY EventGenerator /app
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy the EventGenerator directory contents into the container at /app
-# COPY EventGenerator/fakedata.py /app/fakedata.py
-
-# Run fakedata.py when the container launches
-CMD ["python3", "fakeData.py"]
+COPY schema/ schema/

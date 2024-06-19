@@ -14,9 +14,23 @@
         <flink.version>1.14.0</flink.version>
         <scala.binary.version>2.12</scala.binary.version>
     </properties>
-
+    <repositories>
+        <repository>
+            <id>confluent</id>
+            <url>https://packages.confluent.io/maven/</url>
+        </repository>
+    </repositories>
     <dependencies>
-        <!-- Flink dependencies -->
+        <dependency>
+            <groupId>io.confluent</groupId>
+            <artifactId>kafka-json-schema-serializer</artifactId>
+            <version>7.2.3</version>
+        </dependency>
+        <dependency>
+            <groupId>io.confluent</groupId>
+            <artifactId>kafka-schema-registry-client</artifactId>
+            <version>7.2.3</version>
+        </dependency>
         <dependency>
             <groupId>org.apache.flink</groupId>
             <artifactId>flink-connector-files</artifactId>
@@ -28,11 +42,6 @@
             <artifactId>flink-streaming-scala_${scala.binary.version}</artifactId>
             <version>${flink.version}</version>
         </dependency>
-<!--        <dependency>-->
-<!--            <groupId>org.apache.flink</groupId>-->
-<!--            <artifactId>flink-clients_${scala.binary.version}</artifactId>-->
-<!--            <version>${flink.version}</version>-->
-<!--        </dependency>-->
         <dependency>
             <groupId>org.apache.flink</groupId>
             <artifactId>flink-connector-kafka_${scala.binary.version}</artifactId>
@@ -44,14 +53,12 @@
             <version>${flink.version}</version>
         </dependency>
 
-        <!-- JSON library for parsing -->
         <dependency>
             <groupId>org.json</groupId>
             <artifactId>json</artifactId>
             <version>20210307</version>
         </dependency>
 
-        <!-- Redis client -->
         <dependency>
             <groupId>redis.clients</groupId>
             <artifactId>jedis</artifactId>
@@ -60,7 +67,6 @@
     </dependencies>
     <build>
         <plugins>
-            <!-- Scala compiler plugin -->
             <plugin>
                 <groupId>net.alchim31.maven</groupId>
                 <artifactId>scala-maven-plugin</artifactId>
@@ -74,8 +80,6 @@
                     </execution>
                 </executions>
             </plugin>
-
-            <!-- Compiler plugin -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
@@ -85,8 +89,6 @@
                     <target>1.8</target>
                 </configuration>
             </plugin>
-
-            <!-- Shade plugin to create an uber-jar -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-shade-plugin</artifactId>
@@ -108,7 +110,6 @@
                             <finalName>${project.build.finalName}-backup-job</finalName>
                         </configuration>
                     </execution>
-                    <!-- Execution for TransactionsMLFeaturesBackfillJob -->
                     <execution>
                         <id>shade-backfill-job</id>
                         <phase>package</phase>

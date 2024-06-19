@@ -29,6 +29,27 @@ services:
       volumes:
         - ./create-topics.sh:/tmp/create-topics.sh
       command: [ "sh", "-c", "/tmp/create-topics.sh" ]
+
+  schema-registry:
+    image: confluentinc/cp-schema-registry:latest
+    depends_on:
+      - kafka
+    environment:
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: PLAINTEXT://kafka:9092
+      SCHEMA_REGISTRY_HOST_NAME: schema-registry
+      SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8082
+    ports:
+      - "8082:8082"
+
+  schema-registry-setup:
+    image: curlimages/curl:latest
+    depends_on:
+      - schema-registry
+    volumes:
+      - ./register-schema.sh:/usr/bin/register-schema.sh
+      - ./schema:/schema
+    entrypoint: [ "sh", "/usr/bin/register-schema.sh" ]
+
   flink-jobmanager:
      image: flink:1.14.0
      command: jobmanager
@@ -67,13 +88,16 @@ services:
        - "6379:6379"
      environment:
        - ALLOW_EMPTY_PASSWORD=yes
+
   transactions-producer:
      build:
        context: .
        dockerfile: Dockerfile.producer
      depends_on:
        - kafka
+       - schema-registry-setup
 
+     entrypoint: [ "sh", "-c", "sleep 60 && python /app/producer.py" ]
   transactions-backup-job:
      build:
        context: .
@@ -82,6 +106,7 @@ services:
        - kafka
        - flink-jobmanager
        - flink-taskmanager
+       - transactions-producer
      volumes:
        - ./backup:/app/backup
        - ./target:/app

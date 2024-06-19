@@ -1,7 +1,7 @@
 package com.remotebank.transactions
 
 import org.apache.flink.api.common.eventtime.WatermarkStrategy
-import org.apache.flink.api.common.serialization.{SimpleStringEncoder, SimpleStringSchema}
+import org.apache.flink.api.common.serialization.SimpleStringEncoder
 import org.apache.flink.api.common.state.{ValueState, ValueStateDescriptor}
 import org.apache.flink.api.scala.createTypeInformation
 import org.apache.flink.connector.file.sink.FileSink
@@ -30,17 +30,19 @@ object TransactionsMLFeaturesBackfillJob {
     val properties = new Properties()
     properties.setProperty("bootstrap.servers", "kafka:9092")
     properties.setProperty("group.id", "ml-features-job")
+    properties.setProperty("schema.registry.url", "http://schema-registry:8082")
 
     // Kafka Source
-    val kafkaSource = KafkaSource.builder[String]()
+    val kafkaSource = KafkaSource.builder[java.util.Map[String, Any]]()
       .setBootstrapServers("kafka:9092")
       .setTopics("transactions")
       .setGroupId("ml-features-job")
       .setStartingOffsets(OffsetsInitializer.earliest())
-      .setValueOnlyDeserializer(new SimpleStringSchema())
+      .setProperties(properties)
+      .setValueOnlyDeserializer(new CustomJsonSchemaDeserializationSchema)
       .build()
 
-    val transactionsStream = env.fromSource(kafkaSource, WatermarkStrategy.noWatermarks(), "transactions-ml-features-job")
+    val transactionsStream = env.fromSource(kafkaSource, WatermarkStrategy.noWatermarks[java.util.Map[String, Any]](), "transactions-ml-features-job")
 
     // File Sink for real-time and historical data
     val fileSink = FileSink.forRowFormat(new Path("file:///ml-features"), new SimpleStringEncoder[String]("UTF-8"))
@@ -73,7 +75,7 @@ object TransactionsMLFeaturesBackfillJob {
   }
 
   // Function to process real-time transactions
-  def processTransactions(transactionsStream: DataStream[String]): DataStream[UserTransactionCount] = {
+  def processTransactions(transactionsStream: DataStream[java.util.Map[String, Any]]): DataStream[UserTransactionCount] = {
     transactionsStream
       .map(record => {
         val json = new JSONObject(record)
